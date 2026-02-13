@@ -95,11 +95,4 @@ Time overrun	Low	MVP features done by hour 8
 Conclusion
 This AI Smart Expense & Payroll Management System addresses a critical pain point for startups by automating financial operations and providing intelligent insights. By combining robust payroll calculations, intelligent expense categorization, and predictive analysis, the system enables founders to make data-driven financial decisions and maintain better control over company finances. The phased implementation approach ensures a solid MVP can be delivered within the given timeline while laying the groundwork for advanced features.
 
-Prepared By  :
-Team Name : WEB SCRAPERS
-Team ID: 11012
-Members:
-1.Aashish Kumar Sahoo- 12505467
-2.Aaditya Kumar- 12526487
-3.Bhojraj Sahu- 12517589
-4.Ashutosh Raj- 12520146 
+
