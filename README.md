@@ -68,14 +68,18 @@ Deployment: Vercel (frontend) + Supabase (backend)
 6	Health Score	AI insight
 7	Live Deployment	Accessible online
 8	Responsive Design	Mobile-friendly
-8. MVP (Minimum Viable Product) Scope:
+
+
+9. MVP (Minimum Viable Product) Scope:
 Must-Have Features
 Basic employee and payroll management (salary, deductions, net pay calculation)
 Expense entry and AI-based category suggestion
 Monthly financial summary dashboard with total income, expenses, and net
 Basic anomaly detection for unusual expenses
 Financial health score and basic dashboard.
-9. Success Metrics:
+
+
+11. Success Metrics:
 Payroll accuracy: 100% match with manual calculations
 Expense categorization: > 85% accuracy with AI
 Anomaly detection: Precision > 80%, Recall > 60%
@@ -85,13 +89,12 @@ User satisfaction: Intuitive UI with minimal on-boarding.
 
 
 
+12. RISK MITIGATION:
+Risk|	Impact|	Mitigation
+Claude API| rate limit	Low|	Free tier, sufficient
+Deployment issue|	Medium | Manual app still works locally
+Time overrun|	Low	| MVP features 
 
-10. RISK MITIGATION:
-Risk	Impact	Mitigation
-Supabase downtime	Low	Use sample data, ready to demo offline
-Claude API rate limit	Low	Free tier, sufficient
-Deployment issue	Medium	Manual app still works locally
-Time overrun	Low	MVP features done by hour 8
 Conclusion
 This AI Smart Expense & Payroll Management System addresses a critical pain point for startups by automating financial operations and providing intelligent insights. By combining robust payroll calculations, intelligent expense categorization, and predictive analysis, the system enables founders to make data-driven financial decisions and maintain better control over company finances. The phased implementation approach ensures a solid MVP can be delivered within the given timeline while laying the groundwork for advanced features.
 
