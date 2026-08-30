@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 
 from app.auth import login_user, register_user
 from app.accounts.service import (
@@ -13,6 +14,7 @@ from app.transactions.service import (
     get_transaction_summary,
     update_transaction,
     delete_transaction,
+    restore_transaction,
 )
 
 from app.categories.manager import (
@@ -894,8 +896,140 @@ else:
 
         st.subheader("📋 Transaction History")
 
+        # ============================================================
+        # TRANSACTION FILTERS
+        # ============================================================
+
+        st.subheader("🔍 Filter Transactions")
+
+        filter_col1, filter_col2, filter_col3 = st.columns(3)
+
+        with filter_col1:
+
+            filter_type = st.selectbox(
+                "Type",
+                ["All", "Income", "Expense"],
+                key="filter_type",
+            )
+
+        with filter_col2:
+
+            filter_account = st.selectbox(
+                "Account",
+                ["All Accounts"]
+                + [
+                    account["account_name"]
+                    for account in accounts
+                ],
+                key="filter_account",
+            )
+
+        with filter_col3:
+
+            filter_category = st.selectbox(
+                "Category",
+                ["All Categories"]
+                + [
+                    category["name"]
+                    for category in get_categories(
+                        user_id=user_id
+                    )
+                ],
+                key="filter_category",
+            )
+
+        date_col1, date_col2, date_col3 = st.columns(3)
+
+        with date_col1:
+
+            filter_start_date = st.date_input(
+                "From",
+                value=None,
+                key="filter_start_date",
+            )
+
+        with date_col2:
+
+            filter_end_date = st.date_input(
+                "To",
+                value=None,
+                key="filter_end_date",
+            )
+
+        with date_col3:
+
+            st.write("")
+            st.write("")
+
+            clear_filters = st.button(
+                "🔄 Clear Filters",
+                use_container_width=True,
+            )
+
+        if clear_filters:
+            st.rerun()
+
+
+        # ============================================================
+        # RESOLVE FILTER IDs
+        # ============================================================
+
+        selected_account_id = None
+
+        if filter_account != "All Accounts":
+
+            for account in accounts:
+
+                if account["account_name"] == filter_account:
+
+                    selected_account_id = account["id"]
+                    break
+
+
+        selected_category_id = None
+
+        if filter_category != "All Categories":
+
+            all_categories = get_categories(
+                user_id=user_id
+            )
+
+            for category in all_categories:
+
+                if category["name"] == filter_category:
+
+                    selected_category_id = category["id"]
+                    break
+
+
+        selected_transaction_type = None
+
+        if filter_type == "Income":
+            selected_transaction_type = "income"
+
+        elif filter_type == "Expense":
+            selected_transaction_type = "expense"
+
+
+        # ============================================================
+        # GET FILTERED TRANSACTIONS
+        # ============================================================
+
         transactions = get_transactions(
-            user_id=user_id
+            user_id=user_id,
+            account_id=selected_account_id,
+            category_id=selected_category_id,
+            transaction_type=selected_transaction_type,
+            start_date=(
+                str(filter_start_date)
+                if filter_start_date
+                else None
+            ),
+            end_date=(
+                str(filter_end_date)
+                if filter_end_date
+                else None
+            ),
         )
 
         if not transactions:
@@ -1199,19 +1333,520 @@ else:
 
         st.title("📊 Analytics")
 
-        st.info(
-            "Analytics dashboard is coming next."
+        st.caption(
+            f"Understand your financial activity, {user_name}."
         )
 
+        # ====================================================
+        # GET USER TRANSACTIONS
+        # ====================================================
 
-    # ========================================================
+        analytics_transactions = get_transactions(
+            user_id=user_id
+        )
+
+        if not analytics_transactions:
+
+            st.info(
+                "No transaction data available yet. "
+                "Add some transactions to see your analytics."
+            )
+
+        else:
+
+            # ====================================================
+            # PREPARE DATA
+            # ====================================================
+
+            analytics_data = []
+
+            for transaction in analytics_transactions:
+
+                amount = float(
+                    str(transaction["amount"])
+                    .replace("₹", "")
+                    .replace(",", "")
+                )
+
+                analytics_data.append(
+                    {
+                        "date": transaction["transaction_date"],
+                        "type": transaction["transaction_type"],
+                        "amount": amount,
+                        "category": (
+                            transaction.get("category_name")
+                            or "Uncategorized"
+                        ),
+                    }
+                )
+
+            df = pd.DataFrame(analytics_data)
+
+            # ====================================================
+            # SUMMARY
+            # ====================================================
+
+            total_income = df.loc[
+                df["type"] == "income",
+                "amount"
+            ].sum()
+
+            total_expense = df.loc[
+                df["type"] == "expense",
+                "amount"
+            ].sum()
+
+            net_cash_flow = (
+                total_income - total_expense
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+
+                st.metric(
+                    "💰 Total Income",
+                    f"₹{total_income:,.2f}",
+                )
+
+            with col2:
+
+                st.metric(
+                    "💸 Total Expenses",
+                    f"₹{total_expense:,.2f}",
+                )
+
+            with col3:
+
+                st.metric(
+                    "📈 Net Cash Flow",
+                    f"₹{net_cash_flow:,.2f}",
+                )
+
+            st.divider()
+
+            # ====================================================
+            # EXPENSE BY CATEGORY
+            # ====================================================
+
+            st.subheader("💸 Expenses by Category")
+
+            expense_df = df[
+                df["type"] == "expense"
+            ]
+
+            if expense_df.empty:
+
+                st.info(
+                    "No expense data available."
+                )
+
+            else:
+
+                category_expenses = (
+                    expense_df
+                    .groupby("category")["amount"]
+                    .sum()
+                    .sort_values(
+                        ascending=False
+                    )
+                )
+
+                st.bar_chart(
+                    category_expenses
+                )
+
+            st.divider()
+
+            # ====================================================
+            # INCOME VS EXPENSE TREND
+            # ====================================================
+
+            st.subheader("📊 Income vs Expenses")
+
+            trend_df = df.copy()
+
+            trend_df["date"] = pd.to_datetime(
+                trend_df["date"]
+            )
+
+            # Create separate income and expense values
+            trend_df["income"] = trend_df.apply(
+                lambda row:
+                    row["amount"]
+                    if row["type"] == "income"
+                    else 0,
+                axis=1,
+            )
+
+            trend_df["expense"] = trend_df.apply(
+                lambda row:
+                    row["amount"]
+                    if row["type"] == "expense"
+                    else 0,
+                axis=1,
+            )
+
+            # Group by actual transaction date
+            daily_summary = (
+                trend_df
+                .groupby("date")[["income", "expense"]]
+                .sum()
+                .sort_index()
+            )
+
+            # Make sure the index is datetime
+            daily_summary.index = pd.to_datetime(
+                daily_summary.index
+            )
+
+            st.line_chart(
+                daily_summary,
+                x_label="Date",
+                y_label="Amount (₹)",
+            )
+
+            # ====================================================
+            # TOP SPENDING CATEGORIES
+            # ====================================================
+
+            st.subheader("🏆 Top Spending Categories")
+
+            if expense_df.empty:
+
+                st.info(
+                    "No spending data available."
+                )
+
+            else:
+
+                top_categories = (
+                    expense_df
+                    .groupby("category")["amount"]
+                    .sum()
+                    .sort_values(
+                        ascending=False
+                    )
+                    .head(5)
+                )
+
+                for index, (
+                    category,
+                    amount,
+                ) in enumerate(
+                    top_categories.items(),
+                    start=1,
+                ):
+
+                    st.write(
+                        f"**{index}. {category}** — "
+                        f"₹{amount:,.2f}"
+                    )
+    #==========================================================
     # INSIGHTS
-    # ========================================================
+    #==========================================================
 
     elif page == "🧠 Insights":
 
         st.title("🧠 FinSage Insights")
 
-        st.info(
-            "FinSage insights are coming next."
+        st.caption(
+            "Simple, explainable observations from your financial activity."
         )
+
+        # ============================================================
+        # GET TRANSACTIONS
+        # ============================================================
+
+        insight_transactions = get_transactions(
+            user_id=user_id
+        )
+
+        if not insight_transactions:
+
+            st.info(
+                "No transactions available yet. "
+                "Add some transactions to generate insights."
+            )
+
+        else:
+
+            # ========================================================
+            # PREPARE DATA
+            # ========================================================
+
+            insight_data = []
+
+            for transaction in insight_transactions:
+
+                amount = float(
+                    str(transaction["amount"])
+                    .replace("₹", "")
+                    .replace(",", "")
+                )
+
+                insight_data.append(
+                    {
+                        "amount": amount,
+                        "type": transaction["transaction_type"],
+                        "category": (
+                            transaction.get("category_name")
+                            or "Uncategorized"
+                        ),
+                        "merchant": (
+                            transaction.get("merchant")
+                            or "Unknown"
+                        ),
+                        "date": transaction["transaction_date"],
+                    }
+                )
+
+            insight_df = pd.DataFrame(
+                insight_data
+            )
+
+            # ========================================================
+            # BASIC TOTALS
+            # ========================================================
+
+            total_income = insight_df.loc[
+                insight_df["type"] == "income",
+                "amount"
+            ].sum()
+
+            total_expense = insight_df.loc[
+                insight_df["type"] == "expense",
+                "amount"
+            ].sum()
+
+            net_cash_flow = (
+                total_income - total_expense
+            )
+
+            expense_df = insight_df[
+                insight_df["type"] == "expense"
+            ]
+
+            income_df = insight_df[
+                insight_df["type"] == "income"
+            ]
+
+            # ========================================================
+            # SUMMARY
+            # ========================================================
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+
+                st.metric(
+                    "💰 Income",
+                    f"₹{total_income:,.2f}",
+                )
+
+            with col2:
+
+                st.metric(
+                    "💸 Expenses",
+                    f"₹{total_expense:,.2f}",
+                )
+
+            with col3:
+
+                st.metric(
+                    "📈 Net Flow",
+                    f"₹{net_cash_flow:,.2f}",
+                )
+
+            st.divider()
+
+            # ========================================================
+            # INSIGHT 1 — CASH FLOW
+            # ========================================================
+
+            st.subheader("💡 Cash Flow")
+
+            if net_cash_flow > 0:
+
+                st.success(
+                    f"Your income is higher than your expenses "
+                    f"by ₹{net_cash_flow:,.2f}."
+                )
+
+            elif net_cash_flow < 0:
+
+                st.warning(
+                    f"Your expenses are higher than your income "
+                    f"by ₹{abs(net_cash_flow):,.2f}."
+                )
+
+            else:
+
+                st.info(
+                    "Your income and expenses are currently balanced."
+                )
+
+            # ========================================================
+            # INSIGHT 2 — TOP SPENDING CATEGORY
+            # ========================================================
+
+            if not expense_df.empty:
+
+                st.subheader("🏆 Top Spending Category")
+
+                category_totals = (
+                    expense_df
+                    .groupby("category")["amount"]
+                    .sum()
+                    .sort_values(
+                        ascending=False
+                    )
+                )
+
+                top_category = (
+                    category_totals.index[0]
+                )
+
+                top_category_amount = (
+                    category_totals.iloc[0]
+                )
+
+                expense_percentage = (
+                    top_category_amount
+                    / total_expense
+                    * 100
+                    if total_expense > 0
+                    else 0
+                )
+
+                st.info(
+                    f"**{top_category}** is your highest "
+                    f"spending category at "
+                    f"₹{top_category_amount:,.2f} "
+                    f"({expense_percentage:.1f}% of total expenses)."
+                )
+
+            # ========================================================
+            # INSIGHT 3 — LARGEST EXPENSE
+            # ========================================================
+
+            if not expense_df.empty:
+
+                st.subheader("💸 Largest Expense")
+
+                largest_expense = expense_df.loc[
+                    expense_df["amount"].idxmax()
+                ]
+
+                st.write(
+                    f"Your largest recorded expense is "
+                    f"**₹{largest_expense['amount']:,.2f}** "
+                    f"for **{largest_expense['merchant']}**."
+                )
+
+                st.caption(
+                    f"Category: {largest_expense['category']} • "
+                    f"Date: {largest_expense['date']}"
+                )
+
+            # ========================================================
+            # INSIGHT 4 — UNCATEGORIZED TRANSACTIONS
+            # ========================================================
+
+            uncategorized = insight_df[
+                insight_df["category"] == "Uncategorized"
+            ]
+
+            if not uncategorized.empty:
+
+                st.subheader("⚠️ Uncategorized Transactions")
+
+                uncategorized_total = (
+                    uncategorized["amount"].sum()
+                )
+
+                st.warning(
+                    f"You have **{len(uncategorized)}** "
+                    f"uncategorized transaction(s), "
+                    f"totalling ₹{uncategorized_total:,.2f}. "
+                    f"Adding categories will make your analytics "
+                    f"more useful."
+                )
+
+            # ========================================================
+            # INSIGHT 5 — TRANSACTION ACTIVITY
+            # ========================================================
+
+            st.subheader("📋 Activity Overview")
+
+            activity_col1, activity_col2 = st.columns(2)
+
+            with activity_col1:
+
+                st.metric(
+                    "Total Transactions",
+                    len(insight_df),
+                )
+
+            with activity_col2:
+
+                if not expense_df.empty:
+
+                    average_expense = (
+                        expense_df["amount"].mean()
+                    )
+
+                    st.metric(
+                        "Average Expense",
+                        f"₹{average_expense:,.2f}",
+                    )
+
+                else:
+
+                    st.metric(
+                        "Average Expense",
+                        "₹0.00",
+                    )
+
+            # ========================================================
+            # RECOMMENDATION
+            # ========================================================
+
+            st.divider()
+
+            st.subheader("🎯 FinSage Recommendation")
+
+            if total_expense == 0:
+
+                st.info(
+                    "Start recording your expenses to receive "
+                    "personalized spending insights."
+                )
+
+            elif net_cash_flow < 0:
+
+                st.warning(
+                    "Your current expenses exceed your income. "
+                    "Consider reviewing your highest spending "
+                    "categories and reducing non-essential expenses."
+                )
+
+            elif (
+                total_expense > 0
+                and total_income > 0
+                and total_expense / total_income > 0.8
+            ):
+
+                st.warning(
+                    "Your expenses are taking up a large portion "
+                    "of your recorded income. Consider keeping "
+                    "a larger portion available as savings."
+                )
+
+            else:
+
+                st.success(
+                    "Your recorded cash flow is positive. "
+                    "Keep tracking consistently to understand "
+                    "your spending patterns over time."
+                )
