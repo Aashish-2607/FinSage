@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from app.database.models import initialize_database
 
 from app.auth import login_user, register_user
 from app.accounts.service import (
@@ -23,6 +24,12 @@ from app.categories.manager import (
 )
 
 from datetime import date
+
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
+
+initialize_database()
 
 
 # ============================================================
